@@ -738,12 +738,32 @@ apiApp.delete('/api/scan/session/delete/:id', async (req, res) => {
   }
 });
 
+// === STATIC FILES SERVING (Production) ===
+// Servir les fichiers statiques de l'application Angular en production
+const staticPath = path.join(__dirname, '..', 'dist', 'vidaa-edge', 'browser');
+if (fsSync.existsSync(staticPath)) {
+  // Servir les fichiers statiques
+  apiApp.use(express.static(staticPath));
+  
+  // Pour les routes Angular (SPA), renvoyer index.html
+  apiApp.get('*', (req, res) => {
+    // Ne pas intercepter les routes API
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    res.sendFile(path.join(staticPath, 'index.html'));
+  });
+}
+
 // === SERVER STARTUP ===
 const API_PORT = process.env.API_PORT || 3000;
 
 apiApp.listen(API_PORT, '0.0.0.0', () => {
   console.log(`\n🚀 VIDAA Edge API Server running on port ${API_PORT}`);
   console.log(`   Endpoints available at http://localhost:${API_PORT}/api/*\n`);
+  if (fsSync.existsSync(staticPath)) {
+    console.log(`   Static files served from: ${staticPath}\n`);
+  }
 });
 
 process.on('SIGINT', () => {
