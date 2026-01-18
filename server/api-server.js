@@ -742,16 +742,26 @@ apiApp.delete('/api/scan/session/delete/:id', async (req, res) => {
 // Servir les fichiers statiques de l'application Angular en production
 const staticPath = path.join(__dirname, '..', 'dist', 'vidaa-edge', 'browser');
 if (fsSync.existsSync(staticPath)) {
-  // Servir les fichiers statiques
-  apiApp.use(express.static(staticPath));
+  // Servir les fichiers statiques (fallthrough: true permet de continuer si fichier non trouvé)
+  apiApp.use(express.static(staticPath, { fallthrough: true }));
   
-  // Pour les routes Angular (SPA), renvoyer index.html
-  apiApp.get('*', (req, res) => {
+  // Pour les routes Angular (SPA), renvoyer index.html pour toutes les routes non-API
+  // Ce middleware s'exécute seulement si express.static n'a pas trouvé de fichier
+  apiApp.use((req, res, next) => {
     // Ne pas intercepter les routes API
     if (req.path.startsWith('/api')) {
-      return res.status(404).json({ error: 'API endpoint not found' });
+      return next();
     }
-    res.sendFile(path.join(staticPath, 'index.html'));
+    // Si la réponse n'a pas encore été envoyée, servir index.html pour le routing Angular (SPA)
+    if (!res.headersSent) {
+      res.sendFile(path.join(staticPath, 'index.html'), (err) => {
+        if (err) {
+          next(err);
+        }
+      });
+    } else {
+      next();
+    }
   });
 }
 
